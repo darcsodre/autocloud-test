@@ -33,3 +33,7 @@ class TestSample:
 
         assert sample == same_sample
         assert sample != different_sample
+
+    def test_length(self, sample: Sample):
+        # Testa o método __len__
+        assert len(sample) == 1

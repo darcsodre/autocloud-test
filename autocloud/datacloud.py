@@ -14,9 +14,7 @@ class DataCloud:
     def __init__(self, x: Sample, **kwargs):
         # Inicializa uma nova nuvem de dados com o primeiro ponto x
         self.n: int = 1  # Número de pontos na nuvem
-        if x.data.ndim == 1:
-            x.data = x.data.reshape(-1, 1)
-        self.mean: np.ndarray = x.data.mean(axis=1)  # Média (centroide)
+        self.mean: np.ndarray = x.data.reshape(-1, 1).mean(axis=1)  # Média (centroide)
         self.variance: float = 0.0  # Variância inicial (0 para um único ponto)
         self.pertinency: float = 1.0
         self.typicality: float = 1.0
@@ -39,6 +37,9 @@ class DataCloud:
             f"  typicality={self.typicality}\n"
             f")"
         )
+
+    def __len__(self):
+        return len(self.points)
 
     def _calculate_membership(self, x: Sample) -> float:
         """
@@ -64,7 +65,9 @@ class DataCloud:
         D_k = distance_sq / self.variance
         return 1.0 / (1.0 + D_k)
 
-    def calculate_new_mean(self, x: Sample, old_mean: np.ndarray) -> np.ndarray:
+    def calculate_new_mean(
+        self, x: Sample, old_mean: np.ndarray, num_samples: int = None
+    ) -> np.ndarray:
         """
         Calculates the updated mean after adding a new data point.
 
@@ -77,13 +80,17 @@ class DataCloud:
             The new data point to be included in the mean calculation.
         old_mean : np.ndarray
             The mean before including the new data point.
+        num_samples : int, optional
+            The number of samples after including the new data point.
+            If not provided, it defaults to the current number of points in the cloud.
 
         Returns
         -------
         np.ndarray
             The updated mean after including the new data point.
         """
-        return ((self.n - 1) * old_mean + x.data) / self.n
+        num_samples = num_samples or self.n
+        return ((num_samples - 1) * old_mean + x.data) / num_samples
 
     def _update_typicality(self, x: Sample):
         """
@@ -109,7 +116,8 @@ class DataCloud:
         new_mean: np.ndarray,
         old_mean: np.ndarray,
         old_variance: float,
-    ) -> float:
+        num_samples: int = None,
+    ) -> float | np.ndarray[float]:
         """
         Calculates the updated variance after adding a new data point.
 
@@ -127,16 +135,22 @@ class DataCloud:
             The mean before including the new data point.
         old_variance : float
             The variance before including the new data point.
+        num_samples : int, optional
+            The number of samples after including the new data point.
+            If not provided, it defaults to the current number of points in the cloud.
 
         Returns
         -------
-        float
+        float | np.ndarray[float]
             The updated variance after including the new data point, constrained by min_var.
         """
+        num_samples = num_samples or self.n
         delta = x.data - old_mean
         delta2 = x.data - new_mean
-        new_variance = ((self.n + 1) * old_variance + np.dot(delta, delta2)) / (self.n)
-        return max(new_variance, self.min_var)
+        new_variance = ((num_samples + 1) * old_variance + np.dot(delta, delta2)) / (
+            num_samples
+        )
+        return np.maximum(new_variance, self.min_var)
 
     def append_sample_to_datacloud(self, x: Sample):
         """
@@ -235,6 +249,38 @@ class DataCloud:
         """
         return self.calculate_eccentricity(points, mean, variance) / 2
 
+    def merge_dataclouds(self, other: "DataCloud") -> "DataCloud":
+        """
+        Merges another DataCloud into this one, updating the mean, variance,
+        pertinency, and typicality accordingly.
+
+        Parameters
+        ----------
+        other : DataCloud
+            The DataCloud to be merged into this one.
+
+        Returns
+        -------
+        DataCloud
+            The updated DataCloud after merging.
+        """
+        s_i = set(self.points)
+        s_j = set(other.points)
+        mean_i = self.mean
+        mean_j = other.mean
+        variance_i = self.variance
+        variance_j = other.variance
+        weighted_mean = (len(self) * mean_i + len(other) * mean_j) / (
+            len(self) + len(other)
+        )
+        weighted_variance = (
+            (len(self) - 1) * variance_i + (len(other) - 1) * variance_j
+        ) / (len(self) + len(other) - 2)
+        self.points = list(s_i | s_j)  # Unifica os pontos
+        self.mean = weighted_mean
+        self.variance = weighted_variance
+        return self
+
     def __add__(self, x: Union[Sample, "DataCloud"]) -> "DataCloud":
         """
         Merges another DataCloud or a new point into this DataCloud.
@@ -254,8 +300,12 @@ class DataCloud:
             The updated DataCloud after merging.
         """
         if isinstance(x, DataCloud):
-            pass  # TODO: Implementar merge de DataClouds
-        else:
-            # Assume x is a single data point (Sample)
-            self.append_sample_to_datacloud(x)
+            if len(x) == 1:
+                # If x is a single point, append it to the current cloud
+                self.append_sample_to_datacloud(x.points[0])
+                return self
+            # If x is a DataCloud, merge it with the current cloud
+            return self.merge_dataclouds(x)
+        # Assume x is a single data point (Sample)
+        self.append_sample_to_datacloud(x)
         return self

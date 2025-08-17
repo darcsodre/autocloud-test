@@ -10,11 +10,14 @@ class Sample:
         return f"Sample(sample_id={self.sample_id}, data={self.data})"
 
     def __hash__(self):
-        return self.sample_id
+        return hash((self.sample_id, self.data.tobytes()))
 
     def __eq__(self, other):
         if not isinstance(other, Sample):
             return False
         return self.sample_id == other.sample_id and np.array_equal(
-            self.data, other.data
+            self.data.flatten(), other.data.flatten()
         )
+
+    def __len__(self):
+        return 1
