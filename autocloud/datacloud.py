@@ -19,11 +19,15 @@ class DataCloud:
         self.pertinency: float = 1.0
         self.typicality: float = 1.0
         self._E: float = 0.0  # eccentricidade média acumulada
-        self.id: int = self.N  # NOVO: ID único e fixo para cada cloud
+        self.id: int = DataCloud.N  # NOVO: ID único e fixo para cada cloud
         self.points: list[Sample] = [
             x
         ]  # NOVO2: Armazena pontos para cálculo de intersecção
-        self.N += 1  # Incrementa contador global
+        DataCloud.N += 1  # Incrementa contador global
+        # self._merged_clouds: set[int] = set()  # NOVO: Armazena IDs de nuvens mescladas
+        self.set_data_points = set(
+            [x]
+        )  # NOVO: Armazena pontos para controle de intersecção
         self.min_var: float = kwargs.pop("min_var", 1e-3)
 
     def __repr__(self):
@@ -40,6 +44,9 @@ class DataCloud:
 
     def __len__(self):
         return len(self.points)
+
+    def __hash__(self):
+        return hash(self.id)
 
     def _calculate_membership(self, x: Sample) -> float:
         """
@@ -189,26 +196,32 @@ class DataCloud:
         )
         self._update_typicality(x)
         self.points.append(x)  # NOVO2: salva ponto para controle de intersecção
+        self.set_data_points.add(x)  # NOVO: salva ponto para controle de intersecção
 
     def calculate_eccentricity(
-        self, points: np.ndarray, mean: float, variance: float
+        self,
+        num_points: np.ndarray,
+        mean: float,
+        variance: float,
+        point: np.ndarray,
     ) -> float:
         """
-        Calculates the eccentricity of a set of points relative to a mean and
-        variance.
+        Calculates the eccentricity of a point relative to a mean and variance of the
+        cloud.
 
-        Eccentricity is the normalized squared distance of the points
-        from the mean, scaled by the variance and normalized by the number of
-        points.
+        Eccentricity is the normalized squared distance of the point from the mean,
+        scaled by the variance and normalized by the number of points.
 
         Parameters
         ----------
-        points : np.ndarray
-            The set of points for which to calculate eccentricity.
+        num_points : np.ndarray
+            The number of points (or an array of counts) used for normalization.
         mean : float
             The mean value of the data cloud.
         variance : float
             The variance of the data cloud.
+        point : np.ndarray
+            The point for which to calculate eccentricity.
 
         Returns
         -------
@@ -219,35 +232,42 @@ class DataCloud:
             return 0.0
 
         eccentricity = (
-            1 + (np.linalg.norm(points - mean, axis=1) ** 2) / variance
-        ) / len(points)
+            1 + ((np.linalg.norm(point - mean) ** 2) / variance)
+        ) / num_points
         return eccentricity
 
     def calculate_normalized_eccentricity(
-        self, points: np.ndarray, mean: float, variance: float
+        self, num_points: np.ndarray, mean: float, variance: float, point: np.ndarray
     ) -> float:
         """
-        Calculates the normalized eccentricity of a set of points relative to a mean and
-        variance.
+        Calculates the normalized eccentricity of a point relative to a mean and
+        variance of the cloud.
 
         Normalized eccentricity is the normalized squared distances
-        of the points from the mean, scaled by the variance, divided by 2.
+        of the point from the mean, scaled by the variance, divided by 2.
 
         Parameters
         ----------
-        points : np.ndarray
-            The set of points for which to calculate normalized eccentricity.
+        num_points : np.ndarray
+            The number of points (or an array of counts) used for normalization.
         mean : float
             The mean value of the data cloud.
         variance : float
             The variance of the data cloud.
+        point : np.ndarray
+            The point for which to calculate eccentricity.
 
         Returns
         -------
         float
             The calculated normalized eccentricity value.
         """
-        return self.calculate_eccentricity(points, mean, variance) / 2
+        return (
+            self.calculate_eccentricity(
+                num_points=num_points, mean=mean, variance=variance, point=point
+            )
+            / 2
+        )
 
     def merge_dataclouds(self, other: "DataCloud") -> "DataCloud":
         """
@@ -264,8 +284,8 @@ class DataCloud:
         DataCloud
             The updated DataCloud after merging.
         """
-        s_i = set(self.points)
-        s_j = set(other.points)
+        s_i = self.set_data_points
+        s_j = other.set_data_points
         mean_i = self.mean
         mean_j = other.mean
         variance_i = self.variance
@@ -279,6 +299,7 @@ class DataCloud:
         self.points = list(s_i | s_j)  # Unifica os pontos
         self.mean = weighted_mean
         self.variance = weighted_variance
+        self.set_data_points = s_i | s_j  # Atualiza o conjunto de pontos
         return self
 
     def __add__(self, x: Union[Sample, "DataCloud"]) -> "DataCloud":
