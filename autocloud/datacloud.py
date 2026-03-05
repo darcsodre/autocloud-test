@@ -1,34 +1,44 @@
-# import logging
-import numpy as np
+# Aqui contem tudo que é estado + equações recursivas de uma nuvem
+# (média, variância, excentricidade, typicality, merge).
 
+import numpy as np
 from typing import Union
 
 from .sample import Sample
 
-# LOGGER = logging.getLogger(__name__)
-
 
 class DataCloud:
+    """
+    Representa uma nuvem de dados (cloud) do AutoCloud/TEDA.
+
+    Mantém estatísticas recursivas (média e variância) e métricas associadas:
+    - pertinency (membership TEDA)
+    - typicality (típico vs excêntrico)
+    - conjunto de amostras para controle de interseção (merge)
+    """
+
     N = 0  # Contador global de nuvens de dados
 
     def __init__(self, x: Sample, **kwargs):
         # Inicializa uma nova nuvem de dados com o primeiro ponto x
         self.n: int = 1  # Número de pontos na nuvem
-        self.mean: np.ndarray = x.data.reshape(-1, 1).mean(axis=1)  # Média (centroide)
-        self.variance: float = 0.0  # Variância inicial (0 para um único ponto)
+        self.mean: np.ndarray = x.data.reshape(-1, 1).mean(axis=1)  # (d,)
+        self.variance: float = 0.0  # Variância escalar inicial (0 com um único ponto)
+
+        # TEDA/AutoCloud métricas
         self.pertinency: float = 1.0
         self.typicality: float = 1.0
-        self._E: float = 0.0  # eccentricidade média acumulada
-        self.id: int = DataCloud.N  # NOVO: ID único e fixo para cada cloud
-        self.points: list[Sample] = [
-            x
-        ]  # NOVO2: Armazena pontos para cálculo de intersecção
-        DataCloud.N += 1  # Incrementa contador global
-        # self._merged_clouds: set[int] = set()  # NOVO: Armazena IDs de nuvens mescladas
-        self.set_data_points = set(
-            [x]
-        )  # NOVO: Armazena pontos para controle de intersecção
-        self.min_var: float = kwargs.pop("min_var", 1e-3)
+        self._E: float = 0.0  # eccentricidade média acumulada (para typicality)
+
+        # Identidade e armazenamento de pontos
+        self.id: int = DataCloud.N
+        self.points: list[Sample] = [x]
+        self.set_data_points: set[Sample] = {x}
+
+        # Estabilidade numérica
+        self.min_var: float = float(kwargs.pop("min_var", 1e-3))
+
+        DataCloud.N += 1
 
     def __repr__(self):
         return (
@@ -48,285 +58,274 @@ class DataCloud:
     def __hash__(self):
         return hash(self.id)
 
+    # -------------------------
+    # TEDA membership (pertinency)
+    # -------------------------
     def _calculate_membership(self, x: Sample) -> float:
         """
-        Calculates TEDA membership degree for a new point x.
+        Calcula o grau de pertinência (membership) TEDA de um ponto x na cloud.
 
         μ_k = 1 / (1 + D_k)
-        where D_k = ||x - mean||^2 / variance
+        D_k = ||x - mean||² / variance
 
-        Parameters
-        ----------
-        x : Sample
-            The new point.
-
-        Returns
-        -------
-        float
-            Membership degree in [0, 1].
+        Observação:
+        - Se variance <= 0, retorna 1.0 (condição típica no início).
         """
         if self.variance <= 0:
-            return 1.0  # First point always has membership 1
+            return 1.0
 
-        distance_sq = np.linalg.norm(x.data - self.mean) ** 2
-        D_k = distance_sq / self.variance
+        distance_sq = float(np.dot(x.data - self.mean, x.data - self.mean))
+        D_k = distance_sq / float(self.variance)
         return 1.0 / (1.0 + D_k)
 
+    # -------------------------
+    # Mean update (Eq. 14 do AutoCloud 2020)
+    # -------------------------
     def calculate_new_mean(
-        self, x: Sample, old_mean: np.ndarray, num_samples: int = None
+        self,
+        x: Sample,
+        old_mean: np.ndarray,
+        s_new: int,
     ) -> np.ndarray:
         """
-        Calculates the updated mean after adding a new data point.
+        Calcula a média atualizada assumindo a inclusão de x na cloud.
 
-        Uses Equation 4 from the referenced article to update the mean incrementally
-        when a new point `x` is added to the dataset.
+        Implementa a Eq. (14) do artigo (forma equivalente):
+            μ* = ((s_new - 1)/s_new) * μ_old + (1/s_new) * x
 
         Parameters
         ----------
         x : Sample
-            The new data point to be included in the mean calculation.
+            Nova amostra.
         old_mean : np.ndarray
-            The mean before including the new data point.
-        num_samples : int, optional
-            The number of samples after including the new data point.
-            If not provided, it defaults to the current number of points in the cloud.
+            Média antes da inclusão (μ_old).
+        s_new : int
+            Tamanho da cloud APÓS incluir x (s*). Ex.: s_new = n_old + 1.
 
         Returns
         -------
         np.ndarray
-            The updated mean after including the new data point.
+            Nova média (μ*).
         """
-        num_samples = num_samples or self.n
-        return ((num_samples - 1) * old_mean + x.data) / num_samples
+        s_new = int(s_new)
+        return ((s_new - 1) / s_new) * old_mean + (1 / s_new) * x.data
 
-    def _update_typicality(self, x: Sample):
+    # -------------------------
+    # Typicality update (forma incremental)
+    # -------------------------
+    def _update_typicality(self, x: Sample) -> None:
         """
-        Eq. 8 - Incremental typicality from eccentricity
+        Atualiza typicality de forma incremental a partir da eccentricidade média.
 
-        Parameters
-        ----------
-        x : Sample
-            The new data point to update typicality.
+        Nota: aqui você usa uma forma prática baseada em:
+          ecc = ||x - mean||² / variance
+          E = média recursiva de ecc
+          typicality = 1/(1+E)
+
+        Isso mantém a ideia de typicality inversamente relacionada à eccentricidade.
         """
         if self.variance <= 0:
             self.typicality = 1.0
             self._E = 0.0
             return
 
-        ecc = np.linalg.norm(x.data - self.mean) ** 2 / self.variance
+        ecc = float(np.dot(x.data - self.mean, x.data - self.mean)) / float(
+            self.variance
+        )
         self._E = ((self.n - 1) * self._E + ecc) / self.n
         self.typicality = 1.0 / (1.0 + self._E)
 
+    # -------------------------
+    # Variance update (Eq. 15 do AutoCloud 2020)
+    # -------------------------
     def calculate_new_variance(
         self,
         x: Sample,
         new_mean: np.ndarray,
-        old_mean: np.ndarray,
         old_variance: float,
-        num_samples: int = None,
-    ) -> float | np.ndarray[float]:
+        s_new: int,
+    ) -> float:
         """
-        Calculates the updated variance after adding a new data point.
+        Calcula a variância escalar atualizada assumindo a inclusão de x na cloud.
 
-        Uses Equation 5 from the referenced article to update the variance incrementally
-        when a new point `x` is added to the dataset. This method ensures that the
-        variance does not fall below a specified minimum threshold.
+        Implementa a Eq. (15) do artigo (AutoCloud 2020):
+            σ²* = ((s_new - 1)/s_new) * σ²_old + (1/s_new) * ||x - μ*||²
+
+        onde:
+        - σ²_old: variância antes da inclusão
+        - μ*: média após inclusão (new_mean)
+        - s_new: tamanho após incluir x
 
         Parameters
         ----------
         x : Sample
-            The new data point to be included in the variance calculation.
+            Nova amostra.
         new_mean : np.ndarray
-            The updated mean after including the new data point.
-        old_mean : np.ndarray
-            The mean before including the new data point.
+            Média após incluir x (μ*).
         old_variance : float
-            The variance before including the new data point.
-        num_samples : int, optional
-            The number of samples after including the new data point.
-            If not provided, it defaults to the current number of points in the cloud.
+            Variância antes de incluir x (σ²_old).
+        s_new : int
+            Tamanho após incluir x (s*).
 
         Returns
         -------
-        float | np.ndarray[float]
-            The updated variance after including the new data point, constrained by min_var.
+        float
+            Variância atualizada (σ²*), limitada por self.min_var.
         """
-        num_samples = num_samples or self.n
-        delta = x.data - old_mean
-        delta2 = x.data - new_mean
-        new_variance = ((num_samples + 1) * old_variance + np.dot(delta, delta2)) / (
-            num_samples
-        )
-        return np.maximum(new_variance, self.min_var)
+        s_new = int(s_new)
+        old_variance = float(old_variance)
 
-    def append_sample_to_datacloud(self, x: Sample):
+        dist2 = float(np.dot(x.data - new_mean, x.data - new_mean))  # ||x - μ*||²
+        new_variance = ((s_new - 1) / s_new) * old_variance + (1 / s_new) * dist2
+
+        return float(np.maximum(new_variance, self.min_var))
+
+    # -------------------------
+    # Cloud update with a new sample
+    # -------------------------
+    def append_sample_to_datacloud(self, x: Sample) -> None:
         """
-        Updates the data cloud with a new point `x` using recursive equations.
+        Atualiza a cloud incluindo a amostra x.
 
-        This method updates the pertinency (membership), mean, and variance of
-        the data cloud according to recursive formulas (Eqs. 4 and 5 from the
-        referenced article). It also updates the typicality and stores the new
-        point for intersection control.
-
-        Parameters
-        ----------
-        x : Sample
-            The new data point to be added to the cloud.
-
-        Returns
-        -------
-        None
-
-        Notes
-        -----
-        - The mean and variance are updated using custom recursive methods.
-        - The method also updates pertinency and typicality, and appends the
-        new point to the internal list.
+        Passos:
+        1) calcula pertinency (membership TEDA) com estado atual
+        2) incrementa n
+        3) atualiza mean (Eq. 14) usando s_new = n
+        4) atualiza variance (Eq. 15) usando s_new = n
+        5) atualiza typicality
+        6) guarda o ponto em list e set (para merge/interseção)
         """
         self.pertinency = self._calculate_membership(x)
+
         old_mean = self.mean
         old_variance = self.variance
+
+        # após incluir x, o novo tamanho é self.n + 1
         self.n += 1
+        s_new = self.n
 
-        # Atualiza média usando o novo método
-        self.mean = self.calculate_new_mean(x, old_mean=old_mean)
-        # Atualiza variância usando o novo método, passando old_variance
+        self.mean = self.calculate_new_mean(x=x, old_mean=old_mean, s_new=s_new)
         self.variance = self.calculate_new_variance(
-            x, self.mean, old_mean, old_variance
+            x=x,
+            new_mean=self.mean,
+            old_variance=old_variance,
+            s_new=s_new,
         )
-        self._update_typicality(x)
-        self.points.append(x)  # NOVO2: salva ponto para controle de intersecção
-        self.set_data_points.add(x)  # NOVO: salva ponto para controle de intersecção
 
+        self._update_typicality(x)
+
+        self.points.append(x)
+        self.set_data_points.add(x)
+
+    # -------------------------
+    # Eccentricity (Eq. 11/12 no paper: ξ e ζ=ξ/2)
+    # -------------------------
     def calculate_eccentricity(
         self,
-        num_points: np.ndarray,
-        mean: float,
+        num_points: int,
+        mean: np.ndarray,
         variance: float,
         point: np.ndarray,
     ) -> float:
         """
-        Calculates the eccentricity of a point relative to a mean and variance of the
-        cloud.
+        Calcula a eccentricidade ξ de um ponto em relação à cloud (forma do paper).
 
-        Eccentricity is the normalized squared distance of the point from the mean,
-        scaled by the variance and normalized by the number of points.
+            ξ = ( 1 + (||x - μ||² / σ²) ) / s
 
         Parameters
         ----------
-        num_points : np.ndarray
-            The number of points (or an array of counts) used for normalization.
-        mean : float
-            The mean value of the data cloud.
+        num_points : int
+            Número de pontos s (normalização).
+        mean : np.ndarray
+            Média μ.
         variance : float
-            The variance of the data cloud.
+            Variância escalar σ².
         point : np.ndarray
-            The point for which to calculate eccentricity.
+            Vetor do ponto x.
 
         Returns
         -------
         float
-            The calculated eccentricity value.
+            Eccentricidade ξ.
         """
+        variance = float(variance)
         if variance <= 0:
             return 0.0
 
-        eccentricity = (
-            1 + ((np.linalg.norm(point - mean) ** 2) / variance)
-        ) / num_points
-        return eccentricity
+        dist2 = float(np.dot(point - mean, point - mean))
+        return (1.0 + (dist2 / variance)) / int(num_points)
 
     def calculate_normalized_eccentricity(
-        self, num_points: np.ndarray, mean: float, variance: float, point: np.ndarray
+        self,
+        num_points: int,
+        mean: np.ndarray,
+        variance: float,
+        point: np.ndarray,
     ) -> float:
         """
-        Calculates the normalized eccentricity of a point relative to a mean and
-        variance of the cloud.
-
-        Normalized eccentricity is the normalized squared distances
-        of the point from the mean, scaled by the variance, divided by 2.
-
-        Parameters
-        ----------
-        num_points : np.ndarray
-            The number of points (or an array of counts) used for normalization.
-        mean : float
-            The mean value of the data cloud.
-        variance : float
-            The variance of the data cloud.
-        point : np.ndarray
-            The point for which to calculate eccentricity.
-
-        Returns
-        -------
-        float
-            The calculated normalized eccentricity value.
+        Calcula a eccentricidade normalizada ζ = ξ/2 (como no paper).
         """
-        return (
-            self.calculate_eccentricity(
-                num_points=num_points, mean=mean, variance=variance, point=point
-            )
-            / 2
-        )
+        return self.calculate_eccentricity(num_points, mean, variance, point) / 2.0
 
+    # -------------------------
+    # Merge
+    # -------------------------
     def merge_dataclouds(self, other: "DataCloud") -> "DataCloud":
         """
-        Merges another DataCloud into this one, updating the mean, variance,
-        pertinency, and typicality accordingly.
+        Mescla outra cloud nesta cloud, unificando amostras e atualizando estatísticas.
 
-        Parameters
-        ----------
-        other : DataCloud
-            The DataCloud to be merged into this one.
+        Observação:
+        - Aqui você usa média ponderada e uma forma pooled de variância.
+        - Se quiser ficar 100% “paper-faithful”, dá para re-derivar a variância do
+          conjunto unido, mas isso pode ser mais caro.
 
         Returns
         -------
         DataCloud
-            The updated DataCloud after merging.
+            A própria cloud (self) atualizada.
         """
         s_i = self.set_data_points
         s_j = other.set_data_points
+
         mean_i = self.mean
         mean_j = other.mean
-        variance_i = self.variance
-        variance_j = other.variance
-        weighted_mean = (len(self) * mean_i + len(other) * mean_j) / (
-            len(self) + len(other)
-        )
-        weighted_variance = (
-            (len(self) - 1) * variance_i + (len(other) - 1) * variance_j
-        ) / (len(self) + len(other) - 2)
-        self.points = list(s_i | s_j)  # Unifica os pontos
-        self.mean = weighted_mean
-        self.variance = weighted_variance
-        self.set_data_points = s_i | s_j  # Atualiza o conjunto de pontos
+        var_i = float(self.variance)
+        var_j = float(other.variance)
+
+        n_i = len(self)
+        n_j = len(other)
+        n_tot = n_i + n_j
+
+        if n_tot == 0:
+            return self
+
+        # Média ponderada
+        self.mean = (n_i * mean_i + n_j * mean_j) / n_tot
+
+        # Variância pooled (evita divisão por zero)
+        if n_i > 1 and n_j > 1:
+            self.variance = ((n_i - 1) * var_i + (n_j - 1) * var_j) / (n_tot - 2)
+        else:
+            # fallback conservador
+            self.variance = max(var_i, var_j, self.min_var)
+
+        # Unifica pontos
+        self.set_data_points = s_i | s_j
+        self.points = list(self.set_data_points)
+        self.n = len(self.points)
+
         return self
 
     def __add__(self, x: Union[Sample, "DataCloud"]) -> "DataCloud":
         """
-        Merges another DataCloud or a new point into this DataCloud.
-
-        If `x` is a DataCloud, merges its points into this cloud, updating
-        the mean, variance, pertinency, and typicality accordingly.
-        If `x` is a single data point (Sample), adds it to this cloud.
-
-        Parameters
-        ----------
-        x : Sample or DataCloud
-            The new point or DataCloud to be merged into this cloud.
-
-        Returns
-        -------
-        DataCloud
-            The updated DataCloud after merging.
+        Se x for Sample: adiciona o ponto.
+        Se x for DataCloud: mescla as clouds.
         """
         if isinstance(x, DataCloud):
             if len(x) == 1:
-                # If x is a single point, append it to the current cloud
                 self.append_sample_to_datacloud(x.points[0])
                 return self
-            # If x is a DataCloud, merge it with the current cloud
             return self.merge_dataclouds(x)
-        # Assume x is a single data point (Sample)
+
         self.append_sample_to_datacloud(x)
         return self

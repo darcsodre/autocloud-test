@@ -1,3 +1,6 @@
+# Aqui é quem orquestra experimento (carregar dados, montar Samples, varrer parâmetro,
+# executar stream, plotar).
+
 import logging
 import time
 import numpy as np
@@ -134,25 +137,70 @@ def plot_2d_clouds(data_clouds: list[DataCloud], point: Sample = None, **kwargs)
 
 def main():
     # Carregar dados
-    df = pd.read_csv("dataset_entropia_legitimo_malicioso.csv", sep=",")
+    # df = pd.read_csv("dataset_entropia_legitimo_malicioso.csv", sep=",")
+    df = pd.read_csv("dados_robo.csv", sep=",")
+
+    df = df[
+        [
+            "frame.time_relative",
+            "tcp.len", # Usado no artigo
+            "tcp.flags_ack",
+            "tcp.flags_syn",
+            "tcp.flags_fin", # Usado no artigo
+            "tcp.flags_urg",
+            "tcp.flags_ae",
+            "tcp.flags_cwr",
+            "tcp.flags_push",
+            "tcp.flags_res",
+            "tcp.flags_reset",
+            "tcp.flags_ece",
+            "tcp.time_delta", # Usado no artigo
+            "mqtt.msgtype", # Usado no artigo
+            "mqtt.dupflag", # Usado no artigo
+            "mqtt.hdrflags", 
+            "mqtt.len", # Usado no artigo
+            # "mqtt.msg",
+            "mqtt.qos", # Usado no artigo
+            "mqtt.msgid",
+            "velocidade",
+            "angulo",
+            "vbat",
+            "attack_label"
+        ]
+    ] # Substitui valores NaN por 0
+    # ['legitimate', 'dos', 'malformed', 'falsedata']
+    df = df[df["attack_label"].isin(["legitimate", "malformed"])]
+    col_label = "attack_label"
+    col_values = df.columns.tolist()
+    col_values.remove(col_label)
+    for col in col_values:
+        df[col] = df[col].fillna(0)
+        df[col] = df[col].replace("nan", 0)
+    attack_labels_map_index = {
+        i: label for i, label in enumerate(df[col_label])
+    }
 
     # features = df[["tcp.flags.ack", "tcp.flags.syn", "tcp.flags.fin"]].values
-    features = df[["tcp.flags.ack", "tcp.flags.syn"]].values
+    # features = df[["tcp.flags.ack", "tcp.flags.syn"]].values\
+    features = df.values
     features = [
-        Sample(sample_id=i, data=np.array(x))
-        for i, x in enumerate(features[75000:150000])
-        # Sample(sample_id=i, data=np.array(x)) for i, x in enumerate(features[:402513])
+        Sample(
+            sample_id=i,
+            data=np.array(x[:-1]),
+            label=attack_labels_map_index[i]
+            )
+        for i, x in enumerate(features)
     ]
-    array_features = np.array([sample.data for sample in features])
-    max_feature_1 = np.max(array_features[:, 0])
-    min_feature_1 = np.min(array_features[:, 0])
-    max_feature_2 = np.max(array_features[:, 1])
-    min_feature_2 = np.min(array_features[:, 1])
+    # array_features = np.array([sample.data for sample in features])
+    # max_feature_1 = np.max(array_features[:, 0])
+    # min_feature_1 = np.min(array_features[:, 0])
+    # max_feature_2 = np.max(array_features[:, 1])
+    # min_feature_2 = np.min(array_features[:, 1])
     # max_feature_3 = np.max(array_features[:, 2])
     # min_feature_3 = np.min(array_features[:, 2])
     # ms = [0.45]
     # ms = np.linspace(0.1, 1.0, 10)
-    ms = [0.5]
+    ms = [3.0]
     for m in ms:
         print(f"Processing AutoCloud with Chebyshev parameter m={m}")
         auto_cloud = AutoCloud(chebyshev_parameter=m)
@@ -179,7 +227,7 @@ def main():
             #     max_feature_3=max_feature_3,
             #     min_feature_3=min_feature_3,
             # )
-            # print()
+            #print()
             if i % 1000 == 0:
                 update_bar_progress(i + 1, len(features), bar_length)
             # if i % 1 == 0 and i > 0:  # Evita exibir na iteração 0
@@ -190,6 +238,7 @@ def main():
             # print(f"Qualidade atual: {ac.calculate_quality():.4f}")
             # print(f"Tempo estimado restante: {remaining_time:.2f}s")
         elapsed = time.time() - start_time
+        auto_cloud.print_summary()
         # plot_clouds(
         #     auto_cloud.data_clouds,
         #     max_feature_1=max_feature_1,
@@ -199,14 +248,14 @@ def main():
         #     max_feature_3=max_feature_3,
         #     min_feature_3=min_feature_3,
         # )
-        plot_2d_clouds(
-            auto_cloud.data_clouds,
-            max_feature_1=max_feature_1,
-            min_feature_1=min_feature_1,
-            max_feature_2=max_feature_2,
-            min_feature_2=min_feature_2,
-            title=f"Data Clouds for m={m}",
-        )
+        # plot_2d_clouds(
+        #     auto_cloud.data_clouds,
+        #     max_feature_1=max_feature_1,
+        #     min_feature_1=min_feature_1,
+        #     max_feature_2=max_feature_2,
+        #     min_feature_2=min_feature_2,
+        #     title=f"Data Clouds for m={m}",
+        # )
         print(f"\nProcessamento concluído em {elapsed:.2f} segundos.")
 
 
