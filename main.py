@@ -142,53 +142,47 @@ def main():
 
     df = df[
         [
-            "frame.time_relative",
-            "tcp.len", # Usado no artigo
-            "tcp.flags_ack",
-            "tcp.flags_syn",
-            "tcp.flags_fin", # Usado no artigo
-            "tcp.flags_urg",
-            "tcp.flags_ae",
-            "tcp.flags_cwr",
-            "tcp.flags_push",
-            "tcp.flags_res",
-            "tcp.flags_reset",
-            "tcp.flags_ece",
-            "tcp.time_delta", # Usado no artigo
-            "mqtt.msgtype", # Usado no artigo
-            "mqtt.dupflag", # Usado no artigo
-            "mqtt.hdrflags", 
-            "mqtt.len", # Usado no artigo
+            # "frame.time_relative",
+            "tcp.len",  # Usado no artigo
+            # "tcp.flags_ack",
+            # "tcp.flags_syn",
+            "tcp.flags_fin",  # Usado no artigo
+            # "tcp.flags_urg",
+            # "tcp.flags_ae",
+            # "tcp.flags_cwr",
+            # "tcp.flags_push",
+            # "tcp.flags_res",
+            # "tcp.flags_reset",
+            # "tcp.flags_ece",
+            "tcp.time_delta",  # Usado no artigo
+            "mqtt.msgtype",  # Usado no artigo
+            "mqtt.dupflag",  # Usado no artigo
+            # "mqtt.hdrflags",
+            "mqtt.len",  # Usado no artigo
             # "mqtt.msg",
-            "mqtt.qos", # Usado no artigo
-            "mqtt.msgid",
-            "velocidade",
-            "angulo",
-            "vbat",
-            "attack_label"
+            "mqtt.qos",  # Usado no artigo
+            # "mqtt.msgid",
+            # "velocidade",
+            # "angulo",
+            # "vbat",
+            "attack_label",
         ]
-    ] # Substitui valores NaN por 0
+    ]  # Substitui valores NaN por 0
     # ['legitimate', 'dos', 'malformed', 'falsedata']
-    df = df[df["attack_label"].isin(["legitimate", "malformed"])]
+    df = df[df["attack_label"].isin(["legitimate", "dos"])]
     col_label = "attack_label"
     col_values = df.columns.tolist()
     col_values.remove(col_label)
     for col in col_values:
         df[col] = df[col].fillna(0)
         df[col] = df[col].replace("nan", 0)
-    attack_labels_map_index = {
-        i: label for i, label in enumerate(df[col_label])
-    }
+    attack_labels_map_index = {i: label for i, label in enumerate(df[col_label])}
 
     # features = df[["tcp.flags.ack", "tcp.flags.syn", "tcp.flags.fin"]].values
     # features = df[["tcp.flags.ack", "tcp.flags.syn"]].values\
     features = df.values
     features = [
-        Sample(
-            sample_id=i,
-            data=np.array(x[:-1]),
-            label=attack_labels_map_index[i]
-            )
+        Sample(sample_id=i, data=np.array(x[:-1]), label=attack_labels_map_index[i])
         for i, x in enumerate(features)
     ]
     # array_features = np.array([sample.data for sample in features])
@@ -227,7 +221,7 @@ def main():
             #     max_feature_3=max_feature_3,
             #     min_feature_3=min_feature_3,
             # )
-            #print()
+            # print()
             if i % 1000 == 0:
                 update_bar_progress(i + 1, len(features), bar_length)
             # if i % 1 == 0 and i > 0:  # Evita exibir na iteração 0

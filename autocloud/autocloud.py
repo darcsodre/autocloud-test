@@ -63,15 +63,15 @@ class AutoCloud:
     # inclui a cloud mergeada
     # inclui as clouds que não participaram do merge
     def iterate_merge(self, data_clouds: list[DataCloud]) -> list[DataCloud]:
-        new_clouds: list[DataCloud] = []  #lista final após essa rodada.
-        merged_clouds: set[int] = set()  #índices das clouds que foram “consumidas” no merge.
-        has_merged = False  #Ela começa falsa. O código entra nos loops e vai testando pares (i, j)
-        for i in range(
-            0, len(data_clouds) - 1
-        ):  
-        # iterações (bubble sort-like) para verificar merges entre clouds
-        #Quando ele encontra um par que pode ser mergeado.
-        #Ele entra no if self.verify_merge(...)e faz: has_merged = True.
+        new_clouds: list[DataCloud] = []  # lista final após essa rodada.
+        merged_clouds: set[int] = (
+            set()
+        )  # índices das clouds que foram “consumidas” no merge.
+        has_merged = False  # Ela começa falsa. O código entra nos loops e vai testando pares (i, j)
+        for i in range(0, len(data_clouds) - 1):
+            # iterações (bubble sort-like) para verificar merges entre clouds
+            # Quando ele encontra um par que pode ser mergeado.
+            # Ele entra no if self.verify_merge(...)e faz: has_merged = True.
             for j in range(i + 1, len(data_clouds)):
                 if self.verify_merge(
                     data_clouds[i].set_data_points, data_clouds[j].set_data_points
@@ -84,9 +84,9 @@ class AutoCloud:
                     merged_clouds.add(j)
                     has_merged = True
                 if has_merged:
-                    break        #Esse break sai do loop do j assim que o primeiro merge acontece.
+                    break  # Esse break sai do loop do j assim que o primeiro merge acontece.
             if has_merged:
-                break     #Esse segundo break sai do loop do i também.
+                break  # Esse segundo break sai do loop do i também.
         for i in range(len(data_clouds)):
             if i not in merged_clouds:
                 new_clouds.append(data_clouds[i])
@@ -94,9 +94,9 @@ class AutoCloud:
             new_clouds = data_clouds
         return new_clouds
 
-    #merge_clouds(): chama iterate_merge() várias vezes para fazer vários merges, um por iteração, até estabilizar.
+    # merge_clouds(): chama iterate_merge() várias vezes para fazer vários merges, um por iteração, até estabilizar.
     def merge_clouds(self) -> None:
-        has_merged = True   
+        has_merged = True
         data_clouds_candidates = self.data_clouds.copy()
         while has_merged:
             new_clouds = self.iterate_merge(data_clouds_candidates)
@@ -117,6 +117,7 @@ class AutoCloud:
                 new_variance = cloud.calculate_new_variance(
                     x=sample,
                     new_mean=new_mean,
+                    old_mean=cloud.mean,
                     old_variance=cloud.variance,
                     s_new=s_new,
                 )
@@ -159,7 +160,7 @@ class AutoCloud:
         """
         for sample in samples:
             self.run_single_sample(sample)
-    
+
     def print_summary(self) -> None:
         """
         Prints the summary of the AutoCloud algorithm,
