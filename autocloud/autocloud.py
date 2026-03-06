@@ -168,4 +168,6 @@ class AutoCloud:
         """
         print(f"Total Clouds: {len(self.data_clouds)}")
         for index, cloud in enumerate(self.data_clouds):
-            print(f"Cloud {index + 1}: {cloud}")
+            # print(f"Cloud {index + 1}: {cloud}")
+            print(f"Cloud {index + 1}: ")
+            print(cloud.print_label_distribution())

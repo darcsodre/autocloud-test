@@ -371,3 +371,33 @@ class DataCloud:
 
         self.append_sample_to_datacloud(x)
         return self
+
+    def print_label_distribution(self) -> None:
+        """
+        Prints the distribution of points by unique label as proportions and counts.
+
+        Example output:
+            Label Distribution:
+            label_A: ████████░░ 80.0% (8/10)
+            label_B: ██░░░░░░░░ 20.0% (2/10)
+        """
+        if not self.points:
+            print("No points in cloud")
+            return
+
+        # Count points by label
+        label_counts = {}
+        for sample in self.points:
+            label = sample.label if hasattr(sample, "label") else "unknown"
+            label_counts[label] = label_counts.get(label, 0) + 1
+
+        total = len(self.points)
+        bar_length = 10
+
+        print("Label Distribution:")
+        for label in sorted(label_counts.keys()):
+            count = label_counts[label]
+            proportion = count / total
+            filled = int(bar_length * proportion)
+            bar = "█" * filled + "░" * (bar_length - filled)
+            print(f"  {label}: {bar} {proportion*100:.1f}% ({count}/{total})")
