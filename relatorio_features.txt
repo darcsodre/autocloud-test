@@ -1,0 +1,339 @@
+
+============================================================
+Feature: tcp.len
+Shape: (10490,)
+
+Contagem de valores:
+tcp.len
+2896.0    3134
+4.0        637
+35.0       569
+1448.0     560
+5.0        543
+          ... 
+1039.0       1
+180.0        1
+278.0        1
+233.0        1
+369.0        1
+Name: count, Length: 202, dtype: int64
+
+============================================================
+Feature: tcp.flags_ack
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_ack
+1    10490
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_syn
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_syn
+0    10490
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_fin
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_fin
+0    10032
+1      458
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_urg
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_urg
+0    10490
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_ae
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_ae
+0    10490
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_cwr
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_cwr
+0    10490
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_push
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_push
+1    10160
+0      330
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_res
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_res
+0    10490
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_reset
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_reset
+0    10490
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.flags_ece
+Shape: (10490,)
+
+Contagem de valores:
+tcp.flags_ece
+0    10490
+Name: count, dtype: int64
+
+============================================================
+Feature: tcp.time_delta
+Shape: (10490,)
+
+Contagem de valores:
+tcp.time_delta
+1.400000e-08    318
+1.300000e-08    151
+1.500000e-08    131
+1.600000e-08     68
+8.100000e-08     67
+               ... 
+1.666368e-02      1
+7.753498e-03      1
+2.259499e-02      1
+4.626065e-02      1
+7.474143e-02      1
+Name: count, Length: 6997, dtype: int64
+
+============================================================
+Feature: mqtt.msgtype
+Shape: (10490,)
+
+Contagem de valores:
+mqtt.msgtype
+3.0     7150
+1.0     1235
+2.0     1134
+14.0     494
+8.0      110
+9.0      103
+13.0      51
+12.0      50
+4.0       49
+5.0       38
+6.0       38
+7.0       38
+Name: count, dtype: int64
+
+============================================================
+Feature: mqtt.dupflag
+Shape: (10490,)
+
+Contagem de valores:
+mqtt.dupflag
+False    6958
+NaN      3340
+True      192
+Name: count, dtype: int64
+
+============================================================
+Feature: mqtt.hdrflags
+Shape: (10490,)
+
+Contagem de valores:
+mqtt.hdrflags
+110000      6725
+10000       1235
+100000      1134
+11100000     494
+111010       190
+110001       119
+10000010     110
+10010000     103
+110100        62
+110010        52
+11010000      51
+11000000      50
+1000000       49
+1010000       38
+1100010       38
+1110000       38
+111100         2
+Name: count, dtype: int64
+
+============================================================
+Feature: mqtt.len
+Shape: (10490,)
+
+Contagem de valores:
+mqtt.len
+48.0    4224
+2.0      637
+33.0     569
+3.0      543
+0.0      532
+        ... 
+96.0       1
+98.0       1
+88.0       1
+19.0       1
+14.0       1
+Name: count, Length: 89, dtype: int64
+
+============================================================
+Feature: mqtt.msg
+Shape: (10490,)
+
+Contagem de valores:
+mqtt.msg
+NaN                                7268
+{"velocidade":0}                    647
+DoSMessage6                          42
+DoSMessage5                          37
+{"velocidade":0,"angulo":0}          29
+                                   ... 
+{"velocidade":38,"angulo":-117}       1
+{"velocidade":49,"angulo":-109}       1
+{"velocidade":62,"angulo":-105}       1
+{"velocidade":69,"angulo":-103}       1
+{"velocidade":82,"angulo":-100}       1
+Name: count, Length: 1315, dtype: int64
+
+============================================================
+Feature: mqtt.qos
+Shape: (10490,)
+
+Contagem de valores:
+mqtt.qos
+0.0    6844
+NaN    3340
+1.0     242
+2.0      64
+Name: count, dtype: int64
+
+============================================================
+Feature: mqtt.msgid
+Shape: (10490,)
+
+Contagem de valores:
+mqtt.msgid
+NaN     9808
+1.0      279
+2.0      206
+6.0       19
+5.0       18
+23.0      16
+40.0      16
+57.0      16
+74.0      16
+91.0      15
+3.0        9
+4.0        8
+21.0       7
+38.0       6
+55.0       6
+72.0       6
+89.0       6
+7.0        3
+20.0       2
+37.0       2
+54.0       2
+71.0       2
+88.0       2
+24.0       2
+41.0       2
+58.0       2
+75.0       2
+92.0       2
+22.0       1
+39.0       1
+56.0       1
+73.0       1
+8.0        1
+25.0       1
+42.0       1
+59.0       1
+76.0       1
+93.0       1
+Name: count, dtype: int64
+
+============================================================
+Feature: velocidade
+Shape: (10490,)
+
+Contagem de valores:
+velocidade
+NaN      8152
+0.0       683
+100.0     624
+28.0       30
+26.0       28
+         ... 
+44.0        3
+41.0        3
+8.0         3
+24.0        2
+1.0         1
+Name: count, Length: 100, dtype: int64
+
+============================================================
+Feature: angulo
+Shape: (10490,)
+
+Contagem de valores:
+angulo
+ NaN      8799
+ 0.0        31
+-52.0       27
+-179.0      27
+-132.0      26
+          ... 
+ 29.0        1
+ 55.0        1
+-23.0        1
+ 89.0        1
+-119.0       1
+Name: count, Length: 326, dtype: int64
+
+============================================================
+Feature: vbat
+Shape: (10490,)
+
+Contagem de valores:
+vbat
+NaN       10058
+5679.0       15
+5502.0       10
+5662.0        7
+5702.0        7
+          ...  
+5365.0        1
+5644.0        1
+5319.0        1
+5314.0        1
+5200.0        1
+Name: count, Length: 256, dtype: int64

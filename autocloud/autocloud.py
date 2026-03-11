@@ -21,6 +21,7 @@ class AutoCloud:
             []
         )  # começa vazio: nenhuma cloud criada ainda.
         self.internal_counter = 0  # conta quantas amostras já passaram pelo algoritmo. E usadoara tratar a segunda amostra.
+        self.last_merge_eventos = []
 
     def verify_merge(self, set_cloud_i: set[Sample], set_cloud_j: set[Sample]) -> bool:
         """
@@ -74,8 +75,10 @@ class AutoCloud:
             # Ele entra no if self.verify_merge(...)e faz: has_merged = True.
             for j in range(i + 1, len(data_clouds)):
                 if self.verify_merge(
-                    data_clouds[i].set_data_points, data_clouds[j].set_data_points
+                    data_clouds[i].set_data_points, data_clouds[j].set_data_points #detecção de merges
                 ):
+                    self.last_merge_eventos.append((data_clouds[i].id, data_clouds[j].id))
+                
                     new_cloud = (
                         data_clouds[i] + data_clouds[j]
                     )  # “cria uma cloud nova que é a fusão das duas clouds i e j”.
@@ -97,6 +100,7 @@ class AutoCloud:
     # merge_clouds(): chama iterate_merge() várias vezes para fazer vários merges, um por iteração, até estabilizar.
     def merge_clouds(self) -> None:
         has_merged = True
+        self.last_merge_eventos = []
         data_clouds_candidates = self.data_clouds.copy()
         while has_merged:
             new_clouds = self.iterate_merge(data_clouds_candidates)
@@ -104,16 +108,41 @@ class AutoCloud:
             data_clouds_candidates = new_clouds.copy()
         self.data_clouds = new_clouds
 
-    def run_single_sample(self, sample: Sample) -> np.ndarray:
+    def run_single_sample(self, sample: Sample) -> dict:
+        # Guarda apenas as informações que o main precisa imprimir.
+        debug_info = {
+            "sample_id": sample.sample_id,
+            "label": sample.label,
+            "sample_data": sample.data.copy(),
+            "clouds_atualizadas_info": [],
+            "criou_nova_cloud": False,
+            "nova_cloud_id": None,
+            "merge_eventos": [],
+        }
+        
+        # Mantém a lógica original: a segunda amostra entra direto na primeira cloud.
         if self.internal_counter == 1:
+            cloud = self.data_clouds[0]       
+            
             self.data_clouds[0] += sample  # So começa com a segunda amostra
+
+            # Registra somente o necessário para o main.
+            debug_info["clouds_atualizadas_info"].append(
+                {
+                    "cloud_id": cloud.id,
+                    "pertinencia": float(cloud.pertinency),
+                }
+            )
+        
         else:
             has_joined = False
             for cloud_index, cloud in enumerate(self.data_clouds):
                 s_new = len(cloud) + 1
+                
                 new_mean = cloud.calculate_new_mean(
                     x=sample, old_mean=cloud.mean, s_new=s_new
                 )
+                
                 new_variance = cloud.calculate_new_variance(
                     x=sample,
                     new_mean=new_mean,
@@ -121,33 +150,51 @@ class AutoCloud:
                     old_variance=cloud.variance,
                     s_new=s_new,
                 )
-                eccentricity = (
-                    cloud.calculate_eccentricity(  # calculo de exentricidades
+                
+                # calculo de exentricidade
+                eccentricity = cloud.calculate_eccentricity( 
                         num_points=s_new,
                         mean=new_mean,
                         variance=new_variance,
                         point=sample.data,
-                    )
-                )
-                # LOGGER.debug(
-                #     f"Sample {sample.sample_id} - Cloud {cloud_index}: "
-                #     f"Eccentricity: {eccentricity}, Chebyshev Factor: {self.chebyshev_factor / num_points}"
-                # )
+             )
+                
+                #guarda a variavel que ja foi calculada.
+                threshold = self.chebyshev_factor / s_new
+
                 # Calculo do threshold
                 if eccentricity <= (self.chebyshev_factor / s_new):
                     cloud = cloud + sample
                     self.data_clouds[cloud_index] = cloud
                     has_joined = True
-            if (
-                not has_joined
-            ):  # Se a amostra não entrou em nenhuma cloud, cria-se uma nova cloud só com ela
-                new_candidate_cloud = DataCloud(
-                    x=sample,
-                )
+
+                    # Registra só o necessário para o main.
+                    debug_info["clouds_atualizadas_info"].append(
+                        {
+                            "cloud_id": cloud.id,
+                            "pertinencia": float(cloud.pertinency),
+                            "eccentricity": float(eccentricity),
+                            "threshold": float(threshold),
+                        }
+                    )
+            # Mantém a lógica original: se não entrou em nenhuma cloud, cria nova cloud.
+            if not has_joined:
+                new_candidate_cloud = DataCloud(x=sample)
                 self.data_clouds.append(new_candidate_cloud)
-            else:  # Somente verifica merge se a amostra entrou em alguma cloud, para evitar verificações desnecessárias
+
+                debug_info["criou_nova_cloud"] = True
+                debug_info["nova_cloud_id"] = new_candidate_cloud.id
+
+            # Somente verifica merge se a amostra entrou em alguma cloud, para evitar verificações desnecessárias
+            else: 
                 self.merge_clouds()
+                debug_info["merge_eventos"] = self.last_merge_eventos.copy()
+        
+        # Mantém o incremento original.
         self.internal_counter += 1
+
+        # Agora retorna as informações para o main imprimir.
+        return debug_info
 
     def run(self, samples: list[Sample]) -> None:
         """
