@@ -22,6 +22,7 @@ class AutoCloud:
         )  # começa vazio: nenhuma cloud criada ainda.
         self.internal_counter = 0  # conta quantas amostras já passaram pelo algoritmo. E usadoara tratar a segunda amostra.
         self.last_merge_eventos = []
+        self.last_merge_clouds_vivas = []
 
     def verify_merge(self, set_cloud_i: set[Sample], set_cloud_j: set[Sample]) -> bool:
         """
@@ -101,10 +102,17 @@ class AutoCloud:
     def merge_clouds(self) -> None:
         has_merged = True
         self.last_merge_eventos = []
+        self.last_merge_clouds_vivas = []
         data_clouds_candidates = self.data_clouds.copy()
+            
         while has_merged:
             new_clouds = self.iterate_merge(data_clouds_candidates)
             has_merged = len(new_clouds) < len(data_clouds_candidates)
+            
+            #salva a lista dos IDs das clouds que continuam vivas naquele instante.
+            if has_merged:
+                self.last_merge_clouds_vivas.append([cloud.id for cloud in new_clouds])
+
             data_clouds_candidates = new_clouds.copy()
         self.data_clouds = new_clouds
 
@@ -118,6 +126,7 @@ class AutoCloud:
             "criou_nova_cloud": False,
             "nova_cloud_id": None,
             "merge_eventos": [],
+            "clouds_vivas_pos_merge": [],
         }
         
         # Mantém a lógica original: a segunda amostra entra direto na primeira cloud.
@@ -189,6 +198,7 @@ class AutoCloud:
             else: 
                 self.merge_clouds()
                 debug_info["merge_eventos"] = self.last_merge_eventos.copy()
+                debug_info["clouds_vivas_pos_merge"] = self.last_merge_clouds_vivas.copy()
         
         # Mantém o incremento original.
         self.internal_counter += 1

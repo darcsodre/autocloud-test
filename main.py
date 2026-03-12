@@ -137,15 +137,28 @@ def plot_2d_clouds(data_clouds: list[DataCloud], point: Sample = None, **kwargs)
 
 def main():
     # Carregar dados
-    # df = pd.read_csv("dataset_entropia_legitimo_malicioso.csv", sep=",")
-    df = pd.read_csv("autocloud_synthetic_dataset_10000.csv", sep=",")
+    #df = pd.read_csv("dataset_entropia_legitimo_malicioso.csv", sep=",")
+    #df = pd.read_csv("dados_robo_entropia.csv", sep=",")
+    df = pd.read_csv("dados_robo_diff.csv", sep=",")
+    #df = pd.read_csv("dados_robo.csv", sep=",")
+    #df = pd.read_csv("autocloud_synthetic_dataset_10000.csv", sep=",")
+    #df = pd.read_csv("v2_autocloud_synthetic_dataset.csv", sep=",")
 
     df = df[
-        [
-            "feature_1",
-            "feature_2",
-            "feature_3",
-            "label",
+        [   
+            "tcp.len",
+            #"tcp.time_delta",
+            "mqtt.len",
+            "velocidade",
+            "diff_tcp_len",
+            #"diff_tcp_time_delta",
+            "diff_mqtt_len",
+            "diff_velocidade",
+
+            #"feature_1",
+            #"feature_2",
+            #"feature_3",
+            #"label",
             
             # "frame.time_relative",
             ##"tcp.len",  # Usado no artigo, com valores diveros maiores que 0.dos
@@ -166,20 +179,20 @@ def main():
             ##"mqtt.len",  # Usado no artigo, valores diversos.
             # "mqtt.msg",#literalmente mensagens e strings.
             #"mqtt.qos",  # Usado no artigo, tem muito valores NaN,0 e 1. testar
-            ##"mqtt.msgid", #numeros diveross, mas mais da metade é NaN. dos  testar
-            # "velocidade", #mais da metade dos valores são NaN, testar
+            #"mqtt.msgid", #numeros diveross, mas mais da metade é NaN. dos  testar
+            ##"velocidade", #mais da metade dos valores são NaN, testar
             ##"angulo", #mais da metade dos valores são NaN, testar
-            #"attack_label",
+            "attack_label",
         ]
     ]  # Substitui valores NaN por 0
     # ['legitimate', 'dos', 'malformed', 'falsedata']
     
     # Define qual ataque será analisado nesta execução.
     ATTACK_LABEL = "dos"  # Troque para qual ataque quiser analisar.
-    #df = df[df["attack_label"].isin(["legitimate", ATTACK_LABEL])]
-    #col_label = "attack_label"
-    df = df[df["label"].isin(["legitimate", ATTACK_LABEL])]  #dataset sintetico.
-    col_label = "label"    #dataset sintetico.
+    df = df[df["attack_label"].isin(["legitimate", ATTACK_LABEL])] #datarobo.
+    col_label = "attack_label" #datarobo.
+    #df = df[df["label"].isin(["legitimate", ATTACK_LABEL])]  #dataset sintetico.
+    #col_label = "label"    #dataset sintetico.
     #df = df[df["attack_label"].isin(["legitimate", "dos"])]
     col_values = df.columns.tolist()
     col_values.remove(col_label)
@@ -197,7 +210,7 @@ def main():
         for i, x in enumerate(features)
     ]
     
-    ms = [2.5]
+    ms = [1.5]
     for m in ms:
         print(f"Processing AutoCloud with Chebyshev parameter m={m}")
         auto_cloud = AutoCloud(chebyshev_parameter=m)
@@ -229,7 +242,7 @@ def main():
             # Imprime todas as amostras do filtro.
             print("\n" + "=" * 100)
             print(f"Instante k: {i}")
-            print(f"sample_id: {debug_info['sample_id']}")
+            #print(f"sample_id: {debug_info['sample_id']}")
             print(f"label da amostra: {debug_info['label']}")
             print(f"valor da amostra: {debug_info['sample_data']}")
 
@@ -258,8 +271,15 @@ def main():
 
             # Se houve merge após atualização das clouds, mostra os IDs mergeados.
             if debug_info["merge_eventos"]:
-                for id_a, id_b in debug_info["merge_eventos"]:
+                #for id_a, id_b in debug_info["merge_eventos"]:
+                for idx_merge, (id_a, id_b) in enumerate(debug_info["merge_eventos"]):
                     print(f"Merge entre cloud ID {id_a} e cloud ID {id_b}")
+
+                    if idx_merge < len(debug_info["clouds_vivas_pos_merge"]):
+                        print(
+                            f"Clouds vivas após o merge: {debug_info['clouds_vivas_pos_merge'][idx_merge]}"
+                        )
+            
             else:
                 print("Merge: não ocorreu")
 
@@ -289,6 +309,7 @@ def main():
             # print(f"Tempo estimado restante: {remaining_time:.2f}s")
         elapsed = time.time() - start_time
         auto_cloud.print_summary()
+        print(f"IDs das clouds sobreviventes ao final: {[cloud.id for cloud in auto_cloud.data_clouds]}")
         # plot_clouds(
         #     auto_cloud.data_clouds,
         #     max_feature_1=max_feature_1,
